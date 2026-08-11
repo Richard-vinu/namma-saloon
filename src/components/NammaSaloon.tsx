@@ -1,6 +1,6 @@
 "use client";
 
-import { TRACKS, type Track } from "@/lib/tracks";
+import { TRACKS } from "@/lib/tracks";
 import { track as trackEvent } from "@vercel/analytics";
 import {
   useCallback,
@@ -10,27 +10,10 @@ import {
   type CSSProperties,
 } from "react";
 
-const PAINT: [string, string][] = [
-  ["#D8352C", "#F2B32C"],
-  ["#1F4E79", "#EFE6D2"],
-  ["#2E6B5E", "#F2B32C"],
-  ["#6B2418", "#E9C46A"],
-  ["#7A2E6B", "#F6D8A0"],
-  ["#0E5C57", "#EFD9A0"],
-];
-
-function hash(s: string) {
-  return [...s].reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0);
-}
-
 function fmt(s: number) {
   return Number.isFinite(s)
     ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`
     : "0:00";
-}
-
-function paintColors(t: Track): [string, string] {
-  return PAINT[Math.abs(hash(t.film)) % PAINT.length];
 }
 
 function ytReady(): Promise<void> {
@@ -64,7 +47,6 @@ export default function NammaSaloon() {
   const [cur, setCur] = useState("0:00");
   const [dur, setDur] = useState("0:00");
   const [needsSearch, setNeedsSearch] = useState(false);
-  const [thumbFailed, setThumbFailed] = useState(false);
   const [title, setTitle] = useState("Sit down, put the sheet on");
   const [filmLine, setFilmLine] = useState(
     "Press play — the radio's on the shelf",
@@ -81,8 +63,6 @@ export default function NammaSaloon() {
 
   const track = TRACKS[idx];
   const ytId = track.yt.trim();
-  const [bg, fg] = paintColors(track);
-  const showPaint = !ytId || thumbFailed;
 
   const searchHref = `https://www.youtube.com/results?search_query=${encodeURIComponent(
     `${track.title} ${track.film} Kannada song`,
@@ -134,7 +114,6 @@ export default function NammaSaloon() {
       setSeek(0);
       setCur("0:00");
       setDur("0:00");
-      setThumbFailed(false);
       document.title = `${t.title} — Namma`;
 
       if (autoplay) {
@@ -223,30 +202,15 @@ export default function NammaSaloon() {
         <div className="room">
           <div className="stage">
             <div className="brand" aria-label="Namma Saloon">
-              <div className="brand-kn">ನಮ್ಮ ಸಲೂನ್</div>
-              <div className="brand-en">NAMMA</div>
-              <div className="brand-sub">
-                Gents Hair Cutting &amp; Shaving · Est. 1993
-              </div>
-            </div>
-
-            <div className="mirror-wrap">
-              <div className="hook" aria-hidden="true" />
-              <div className={`mirror${playing ? " spin" : ""}`} id="mirror">
-                {showPaint ? (
-                  <div className="paint" style={{ background: bg, color: fg }}>
-                    {track.film}
-                  </div>
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    alt=""
-                    src={`https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`}
-                    onError={() => setThumbFailed(true)}
-                  />
-                )}
-              </div>
-              <div className="shelf" aria-hidden="true" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className="brand-logo"
+                src="/logo.png"
+                alt="ನಮ್ಮ ಸಲೂನ್ · ESTD. ೧೯೪೦"
+                width={1255}
+                height={763}
+                draggable={false}
+              />
             </div>
           </div>
 
@@ -263,21 +227,13 @@ export default function NammaSaloon() {
               >
                 <div className="disc-ring">
                   <div className="disc-face">
-                    {showPaint ? (
-                      <div
-                        className="disc-paint"
-                        style={{ background: bg, color: fg }}
-                      >
-                        {track.film.slice(0, 18)}
-                      </div>
-                    ) : (
+                    {ytId ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         alt=""
                         src={`https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`}
-                        onError={() => setThumbFailed(true)}
                       />
-                    )}
+                    ) : null}
                     <span className="disc-hole" />
                   </div>
                 </div>
