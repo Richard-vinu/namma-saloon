@@ -202,15 +202,20 @@ export default function NammaSaloon() {
         <div className="room">
           <div className="stage">
             <div className="brand" aria-label="Namma Saloon">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                className="brand-logo"
-                src="/logo.png"
-                alt="ನಮ್ಮ ಸಲೂನ್ · ESTD. ೧೯೪೦"
-                width={1255}
-                height={763}
-                draggable={false}
-              />
+              <div className="brand-board">
+                <div className="brand-logo-wrap">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className="brand-logo"
+                    src="/logo.png"
+                    alt="ನಮ್ಮ ಸಲೂನ್ · ESTD. ೧೯೪೦"
+                    width={1255}
+                    height={763}
+                    draggable={false}
+                  />
+                </div>
+                <p className="brand-tag">ನಮ್ಮ ಊರು · ನಮ್ಮ ಸಲೂನ್</p>
+              </div>
             </div>
           </div>
 
