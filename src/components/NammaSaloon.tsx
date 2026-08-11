@@ -16,53 +16,6 @@ function fmt(s: number) {
     : "0:00";
 }
 
-function ytReady(): Promise<void> {
-  return new Promise((res) => {
-    let settled = false;
-    const finish = () => {
-      if (settled || !window.YT?.Player) return;
-      settled = true;
-      res();
-    };
-
-    if (window.YT?.Player) {
-      finish();
-      return;
-    }
-
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      prev?.();
-      finish();
-    };
-
-    if (
-      !document.querySelector(
-        'script[src="https://www.youtube.com/iframe_api"]',
-      )
-    ) {
-      const s = document.createElement("script");
-      s.src = "https://www.youtube.com/iframe_api";
-      document.head.appendChild(s);
-    }
-
-    // Cover the race where the API fires before our callback is hooked
-    const poll = window.setInterval(() => {
-      finish();
-      if (settled) window.clearInterval(poll);
-    }, 40);
-    window.setTimeout(() => window.clearInterval(poll), 20000);
-  });
-}
-
-function readVideoId(player: YT.Player | null | undefined): string {
-  try {
-    return player?.getVideoData?.()?.video_id?.trim() || "";
-  } catch {
-    return "";
-  }
-}
-
 export default function NammaSaloon() {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -81,8 +34,8 @@ export default function NammaSaloon() {
   const [listeners, setListeners] = useState(0);
   const [pullY, setPullY] = useState(0);
 
-  const playerRef = useRef<YT.Player | null>(null);
-  const playerReadyRef = useRef<Promise<YT.Player> | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const srcRef = useRef("");
   const scrubbingRef = useRef(false);
   const idxRef = useRef(0);
   const playingRef = useRef(false);
@@ -96,6 +49,9 @@ export default function NammaSaloon() {
 
   const track = TRACKS[idx];
   const ytId = track.yt.trim();
+  const coverSrc = ytId
+    ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`
+    : "/logo.png";
 
   const searchHref = `https://www.youtube.com/results?search_query=${encodeURIComponent(
     `${track.title} ${track.film} Kannada song`,
@@ -113,72 +69,45 @@ export default function NammaSaloon() {
     void loadRef.current(true, next);
   }, []);
 
-  const ensurePlayer = useCallback(async () => {
-    if (playerRef.current) return playerRef.current;
-    if (playerReadyRef.current) return playerReadyRef.current;
+  useEffect(() => {
+    const audio = new Audio();
+    audio.preload = "auto";
+    audioRef.current = audio;
 
-    playerReadyRef.current = (async () => {
-      await ytReady();
+    const onPlaying = () => setPlayingState(true);
+    const onPause = () => setPlayingState(false);
+    const onEnded = () => step(1);
+    const onLoaded = () => {
+      if (Number.isFinite(audio.duration)) setDur(fmt(audio.duration));
+    };
+    const onError = () => {
+      setNeedsSearch(true);
+      setFilmLine("Couldn't load that track");
+      setPlayingState(false);
+    };
 
-      const host = document.getElementById("ytplayer");
-      if (!host) {
-        throw new Error("YouTube host missing");
-      }
+    audio.addEventListener("playing", onPlaying);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("loadedmetadata", onLoaded);
+    audio.addEventListener("error", onError);
 
-      return await new Promise<YT.Player>((res, rej) => {
-        try {
-          const player = new window.YT!.Player(host, {
-            height: 180,
-            width: 320,
-            playerVars: {
-              playsinline: 1,
-              controls: 0,
-              rel: 0,
-              fs: 0,
-              disablekb: 1,
-              modestbranding: 1,
-              enablejsapi: 1,
-              origin: window.location.origin,
-            },
-            events: {
-              onReady: (e) => {
-                playerRef.current = e.target;
-                res(e.target);
-              },
-              onStateChange: (e) => {
-                if (e.data === window.YT!.PlayerState.ENDED) step(1);
-                if (e.data === window.YT!.PlayerState.PLAYING)
-                  setPlayingState(true);
-                if (e.data === window.YT!.PlayerState.PAUSED)
-                  setPlayingState(false);
-              },
-              onError: () => {
-                setNeedsSearch(false);
-                setFilmLine("That upload won't play here — skipping");
-                setPlayingState(false);
-                window.setTimeout(() => step(1), 1400);
-              },
-            },
-          });
-          playerRef.current = player;
-        } catch (err) {
-          playerReadyRef.current = null;
-          rej(err);
-        }
-      });
-    })();
-
-    try {
-      return await playerReadyRef.current;
-    } catch (err) {
-      playerReadyRef.current = null;
-      throw err;
-    }
+    return () => {
+      audio.pause();
+      audio.removeEventListener("playing", onPlaying);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("loadedmetadata", onLoaded);
+      audio.removeEventListener("error", onError);
+      audio.src = "";
+      audioRef.current = null;
+    };
   }, [setPlayingState, step]);
 
   useEffect(() => {
     loadRef.current = async (autoplay: boolean, at = idxRef.current) => {
       const t = TRACKS[at];
+      const audio = audioRef.current;
       setTitle(t.title);
       setCredits(`${t.music} · ${t.voice}`);
       setSeek(0);
@@ -194,7 +123,7 @@ export default function NammaSaloon() {
         });
       }
 
-      if (!t.yt.trim()) {
+      if (!t.audio.trim()) {
         setNeedsSearch(true);
         setFilmLine(`${t.film} (${t.year})`);
         setPlayingState(false);
@@ -203,25 +132,31 @@ export default function NammaSaloon() {
 
       setNeedsSearch(false);
       setFilmLine(`${t.film} (${t.year})`);
+      if (!audio) return;
 
-      const p = await ensurePlayer();
-      const id = t.yt.trim();
+      if (srcRef.current !== t.audio) {
+        srcRef.current = t.audio;
+        audio.src = t.audio;
+        audio.load();
+      }
 
       if (autoplay) {
-        p.loadVideoById(id);
-        // playVideo after load — media engagement usually allows this after first user tap
-        p.playVideo();
+        try {
+          await audio.play();
+        } catch {
+          setPlayingState(false);
+        }
       } else {
-        p.cueVideoById(id);
+        audio.pause();
+        audio.currentTime = 0;
       }
     };
-  }, [ensurePlayer, setPlayingState]);
+  }, [setPlayingState]);
 
   useEffect(() => {
     const start = Math.floor(Math.random() * TRACKS.length);
     idxRef.current = start;
     setIdx(start);
-    // Warm the API + cue the first song so Play stays inside the user gesture
     void loadRef.current(false, start);
     const t = setTimeout(() => setShowTube(false), 1700);
     return () => clearTimeout(t);
@@ -230,11 +165,11 @@ export default function NammaSaloon() {
   useEffect(() => {
     if (!playing) return;
     const poll = setInterval(() => {
-      const player = playerRef.current;
-      if (!player || scrubbingRef.current || !player.getDuration) return;
-      const d = player.getDuration();
-      const c = player.getCurrentTime();
-      if (!d) return;
+      const audio = audioRef.current;
+      if (!audio || scrubbingRef.current) return;
+      const d = audio.duration;
+      const c = audio.currentTime;
+      if (!d || !Number.isFinite(d)) return;
       setSeek(Math.round((c / d) * 1000));
       setCur(fmt(c));
       setDur(fmt(d));
@@ -259,47 +194,31 @@ export default function NammaSaloon() {
 
   async function onPlay() {
     const t = TRACKS[idxRef.current];
-    const id = t.yt.trim();
-    if (!id) {
-      await loadRef.current(false);
+    const audio = audioRef.current;
+    if (!t.audio.trim() || !audio) {
+      setNeedsSearch(true);
       return;
     }
 
-    // Fast path: player already warm — keep play/pause synchronous with the click
-    const existing = playerRef.current;
-    if (existing?.playVideo) {
-      const loaded = readVideoId(existing);
-      if (loaded === id || loaded) {
-        if (loaded !== id) {
-          existing.loadVideoById(id);
-        }
-        if (playingRef.current) {
-          existing.pauseVideo();
-        } else {
-          existing.playVideo();
-          trackEvent("song_play", {
-            title: t.title,
-            film: t.film,
-            year: t.year,
-          });
-        }
-        return;
-      }
+    if (srcRef.current !== t.audio) {
+      await loadRef.current(true);
+      return;
     }
 
-    // Cold start (API still loading): still attempt play after warm-up
+    if (playingRef.current) {
+      audio.pause();
+      return;
+    }
+
     try {
-      const p = await ensurePlayer();
-      const loaded = readVideoId(p);
-      if (loaded !== id) p.loadVideoById(id);
-      p.playVideo();
+      await audio.play();
       trackEvent("song_play", {
         title: t.title,
         film: t.film,
         year: t.year,
       });
     } catch {
-      setFilmLine("Player couldn't start — try again");
+      setFilmLine("Tap play again — browser blocked audio");
     }
   }
 
@@ -314,7 +233,6 @@ export default function NammaSaloon() {
 
   function playSwitchClick(on: boolean) {
     try {
-      // Physical wall-switch snap (supported on Android / some browsers)
       navigator.vibrate?.(on ? [14, 28, 10] : [10, 22, 16]);
     } catch {
       /* vibrate unsupported */
@@ -324,7 +242,6 @@ export default function NammaSaloon() {
     void ac.resume();
     const t0 = ac.currentTime;
 
-    // Soft mechanical thud + sharp click
     const thud = ac.createOscillator();
     const thudGain = ac.createGain();
     thud.type = "triangle";
@@ -407,7 +324,6 @@ export default function NammaSaloon() {
     return () => stopFanSound();
   }, []);
 
-  // Custom pull-to-refresh (native PTR is blocked by the locked viewport)
   useEffect(() => {
     const THRESHOLD = 78;
     let startY = 0;
@@ -425,7 +341,6 @@ export default function NammaSaloon() {
       if (ignoreTarget(e.target)) return;
       if (e.touches.length !== 1) return;
       startY = e.touches[0].clientY;
-      // Only start from the upper half so the player dock stays usable
       if (startY > window.innerHeight * 0.55) return;
       active = true;
       dy = 0;
@@ -461,19 +376,17 @@ export default function NammaSaloon() {
     };
   }, []);
 
-  // Placeholder presence — persists across refresh; only ±1 while open
   useEffect(() => {
     const MIN = 120;
     const MAX = 320;
     const KEY = "namma-listeners";
 
-    let start = MIN + 80; // ~200 default
+    let start = MIN + 80;
     try {
       const saved = Number(window.localStorage.getItem(KEY));
       if (Number.isFinite(saved) && saved >= MIN && saved <= MAX) {
         start = Math.round(saved);
       } else {
-        // One-time seed from the hour so first visits aren't wild
         const hour = new Date().getHours();
         start = MIN + ((hour * 17) % (MAX - MIN + 1));
       }
@@ -541,10 +454,7 @@ export default function NammaSaloon() {
         />
       </div>
 
-      <div
-        className={`fan${fanOn ? "" : " is-off"}`}
-        aria-hidden="true"
-      />
+      <div className={`fan${fanOn ? "" : " is-off"}`} aria-hidden="true" />
       {showTube && lightsOn ? (
         <div className="tube" aria-hidden="true" />
       ) : null}
@@ -618,13 +528,8 @@ export default function NammaSaloon() {
               >
                 <div className="disc-ring">
                   <div className="disc-face">
-                    {ytId ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        alt=""
-                        src={`https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`}
-                      />
-                    ) : null}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img alt="" src={coverSrc} />
                     <span className="disc-sheen" />
                     <span className="disc-hole" />
                   </div>
@@ -666,17 +571,15 @@ export default function NammaSaloon() {
                     scrubbingRef.current = true;
                     const v = Number((e.target as HTMLInputElement).value);
                     setSeek(v);
-                    const d = playerRef.current?.getDuration?.() || 0;
+                    const d = audioRef.current?.duration || 0;
                     setCur(fmt((v / 1000) * d));
                   }}
                   onChange={(e) => {
                     scrubbingRef.current = false;
-                    const player = playerRef.current;
-                    if (player?.seekTo) {
-                      player.seekTo(
-                        (Number(e.target.value) / 1000) * player.getDuration(),
-                        true,
-                      );
+                    const audio = audioRef.current;
+                    if (audio && Number.isFinite(audio.duration)) {
+                      audio.currentTime =
+                        (Number(e.target.value) / 1000) * audio.duration;
                     }
                   }}
                 />
@@ -728,10 +631,6 @@ export default function NammaSaloon() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div id="ytbox">
-        <div id="ytplayer" />
       </div>
     </>
   );

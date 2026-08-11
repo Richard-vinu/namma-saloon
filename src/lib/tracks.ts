@@ -4,14 +4,12 @@ export type Track = {
   year: number;
   music: string;
   voice: string;
-  /** YouTube video ID (the bit after v=). Empty falls back to a search link. */
+  /** Local MP3 under /public/audio */
+  audio: string;
+  /** YouTube ID for disc art / SEO links */
   yt: string;
 };
 
-/**
- * Paste a YouTube video ID into `yt` for each song.
- * Prefer official label uploads — Lahari, Akash Audio, Anand Audio, Saregama.
- */
 export const TRACKS: Track[] = [
   {
     title: "Neenello Naanalle",
@@ -19,6 +17,7 @@ export const TRACKS: Track[] = [
     year: 1980,
     music: "Classic",
     voice: "Dr. Rajkumar · Saritha",
+    audio: "/audio/neenello-naanalle.mp3",
     yt: "nxNha9W9dQw",
   },
   {
@@ -27,6 +26,7 @@ export const TRACKS: Track[] = [
     year: 1985,
     music: "Classic",
     voice: "Dr. Rajkumar · Geetha",
+    audio: "/audio/aa-moda-baanalli.mp3",
     yt: "tQXtWqpcuGA",
   },
   {
@@ -35,6 +35,7 @@ export const TRACKS: Track[] = [
     year: 2000,
     music: "S. A. Rajkumar",
     voice: "Hariharan · K. S. Chithra",
+    audio: "/audio/kuhu-kuhu-kogile.mp3",
     yt: "rUeyfai1ddc",
   },
   {
@@ -43,6 +44,7 @@ export const TRACKS: Track[] = [
     year: 1989,
     music: "Classic",
     voice: "S. P. Balasubrahmanyam",
+    audio: "/audio/geethanjali.mp3",
     yt: "56ul0WJ15TY",
   },
 ];

@@ -886,17 +886,7 @@ body::before {
   outline-offset: 3px;
 }
 
-/* Off-screen but real-sized — tiny 1×1 players often fail to start audio */
-#ytbox {
-  position: fixed;
-  width: 320px;
-  height: 180px;
-  left: -9999px;
-  top: 0;
-  opacity: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
+/* Off-screen YouTube host removed — playback is local MP3 */
 
 .pull-refresh {
   position: fixed;
