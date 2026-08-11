@@ -436,7 +436,7 @@ export default function NammaSaloon() {
             ) : null}
             <div className="pill" role="region" aria-label="Now playing">
               <div
-                className="disc"
+                className={`disc${playing ? " is-playing" : ""}`}
                 style={
                   {
                     "--progress": `${(seek / 1000) * 100}%`,
@@ -453,6 +453,7 @@ export default function NammaSaloon() {
                         src={`https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`}
                       />
                     ) : null}
+                    <span className="disc-sheen" />
                     <span className="disc-hole" />
                   </div>
                 </div>

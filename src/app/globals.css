@@ -465,6 +465,13 @@ body::before {
   width: clamp(3.4rem, 11vw, 4.4rem);
   height: clamp(3.4rem, 11vw, 4.4rem);
   flex-shrink: 0;
+  border-radius: 50%;
+  transition: filter 0.45s ease, transform 0.45s ease;
+}
+
+.disc.is-playing {
+  filter: drop-shadow(0 0 10px rgba(232, 184, 74, 0.28));
+  animation: disc-glow 2.8s ease-in-out infinite;
 }
 
 .disc-ring {
@@ -476,6 +483,11 @@ body::before {
     #fff var(--progress),
     rgba(255, 255, 255, 0.18) 0
   );
+  transition: padding 0.35s ease;
+}
+
+.disc.is-playing .disc-ring {
+  padding: 3.5px;
 }
 
 .disc-face {
@@ -494,6 +506,12 @@ body::before {
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform 0.6s ease;
+}
+
+.disc.is-playing .disc-face img,
+.disc.is-playing .disc-paint {
+  transform: scale(1.04);
 }
 
 .disc-paint {
@@ -508,6 +526,24 @@ body::before {
   padding: 0.4rem;
 }
 
+.disc-sheen {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.28) 49%,
+    transparent 60%
+  );
+  opacity: 0;
+  transform: translateX(-40%) rotate(12deg);
+}
+
+.disc.is-playing .disc-sheen {
+  animation: disc-sheen 3.4s ease-in-out infinite;
+}
+
 .disc-hole {
   position: absolute;
   left: 50%;
@@ -520,6 +556,40 @@ body::before {
   box-shadow:
     0 0 0 2px rgba(255, 255, 255, 0.55),
     inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 0.4s ease;
+}
+
+.disc.is-playing .disc-hole {
+  box-shadow:
+    0 0 0 2px rgba(255, 245, 220, 0.75),
+    0 0 8px rgba(232, 184, 74, 0.45),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes disc-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 7px rgba(232, 184, 74, 0.18));
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(232, 184, 74, 0.4));
+  }
+}
+
+@keyframes disc-sheen {
+  0%,
+  18% {
+    opacity: 0;
+    transform: translateX(-45%) rotate(12deg);
+  }
+  35% {
+    opacity: 0.85;
+  }
+  55%,
+  100% {
+    opacity: 0;
+    transform: translateX(45%) rotate(12deg);
+  }
 }
 
 .pill-meta {
