@@ -79,6 +79,7 @@ export default function NammaSaloon() {
   );
   const [credits, setCredits] = useState("90s Kannada film songs");
   const [listeners, setListeners] = useState(0);
+  const [pullY, setPullY] = useState(0);
 
   const playerRef = useRef<YT.Player | null>(null);
   const playerReadyRef = useRef<Promise<YT.Player> | null>(null);
@@ -406,6 +407,60 @@ export default function NammaSaloon() {
     return () => stopFanSound();
   }, []);
 
+  // Custom pull-to-refresh (native PTR is blocked by the locked viewport)
+  useEffect(() => {
+    const THRESHOLD = 78;
+    let startY = 0;
+    let active = false;
+    let dy = 0;
+
+    const ignoreTarget = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      return !!el?.closest?.(
+        "input, textarea, button, a, .pill-seek, .pill-controls, .room-switches",
+      );
+    };
+
+    const onStart = (e: TouchEvent) => {
+      if (ignoreTarget(e.target)) return;
+      if (e.touches.length !== 1) return;
+      startY = e.touches[0].clientY;
+      // Only start from the upper half so the player dock stays usable
+      if (startY > window.innerHeight * 0.55) return;
+      active = true;
+      dy = 0;
+    };
+
+    const onMove = (e: TouchEvent) => {
+      if (!active) return;
+      dy = Math.max(0, e.touches[0].clientY - startY);
+      if (dy > 8) setPullY(Math.min(dy * 0.55, 110));
+    };
+
+    const onEnd = () => {
+      if (!active) return;
+      active = false;
+      if (dy >= THRESHOLD) {
+        setPullY(64);
+        window.location.reload();
+        return;
+      }
+      setPullY(0);
+      dy = 0;
+    };
+
+    document.addEventListener("touchstart", onStart, { passive: true });
+    document.addEventListener("touchmove", onMove, { passive: true });
+    document.addEventListener("touchend", onEnd);
+    document.addEventListener("touchcancel", onEnd);
+    return () => {
+      document.removeEventListener("touchstart", onStart);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+      document.removeEventListener("touchcancel", onEnd);
+    };
+  }, []);
+
   // Placeholder presence — persists across refresh; only ±1 while open
   useEffect(() => {
     const MIN = 120;
@@ -471,6 +526,21 @@ export default function NammaSaloon() {
 
   return (
     <>
+      <div
+        className={`pull-refresh${pullY > 12 ? " is-visible" : ""}${pullY >= 78 ? " is-ready" : ""}`}
+        style={{ transform: `translate(-50%, ${Math.max(pullY - 36, -40)}px)` }}
+        aria-hidden="true"
+      >
+        <span
+          className="pull-refresh__spinner"
+          style={
+            pullY < 78
+              ? { transform: `rotate(${pullY * 3.2}deg)` }
+              : undefined
+          }
+        />
+      </div>
+
       <div
         className={`fan${fanOn ? "" : " is-off"}`}
         aria-hidden="true"
