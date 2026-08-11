@@ -131,6 +131,11 @@ body::before {
   }
 }
 
+.fan.is-off {
+  opacity: 0;
+  animation: none;
+}
+
 .tube {
   position: fixed;
   inset: 0;
@@ -138,6 +143,26 @@ body::before {
   pointer-events: none;
   background: #fff;
   animation: strike 1.5s steps(1) forwards;
+}
+
+/* Dim the saloon when the tube is switched off */
+.lights-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 55% at 50% 30%, transparent 0%, rgba(0, 0, 0, 0.15) 100%),
+    rgba(6, 4, 3, 0);
+  opacity: 0;
+  transition: opacity 0.55s ease, background 0.55s ease;
+}
+
+.lights-veil.is-on {
+  opacity: 1;
+  background:
+    radial-gradient(55% 45% at 48% 28%, rgba(20, 14, 8, 0.25) 0%, rgba(4, 2, 1, 0.72) 70%),
+    rgba(3, 2, 1, 0.55);
 }
 
 @keyframes strike {
@@ -370,8 +395,44 @@ body::before {
   width: 100%;
   min-width: 0;
   display: flex;
-  justify-content: center;
-  padding-top: clamp(0.15rem, 0.6vh, 0.4rem);
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.listening {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.2rem 0.55rem;
+  font-family: var(--data);
+  font-size: clamp(0.58rem, 1.5vw, 0.7rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(244, 239, 228, 0.88);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+}
+
+.listening-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #e8b84a;
+  box-shadow: 0 0 0 0 rgba(232, 184, 74, 0.55);
+  animation: listen-pulse 2.2s ease-out infinite;
+}
+
+@keyframes listen-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(232, 184, 74, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 0.45rem rgba(232, 184, 74, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(232, 184, 74, 0);
+  }
 }
 
 .pill {
@@ -617,6 +678,135 @@ body::before {
 
 .pbtn.play:hover {
   background: #f4f0ea;
+}
+
+.room-switches {
+  position: fixed;
+  top: 50%;
+  right: calc(0.55rem + var(--safe-r));
+  transform: translateY(-50%);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  pointer-events: auto;
+}
+
+.glass-switch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.22rem;
+  min-width: 0;
+  width: 2.55rem;
+  padding: 0.28rem 0.28rem 0.32rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  transition:
+    background 0.28s ease,
+    border-color 0.28s ease,
+    box-shadow 0.28s ease,
+    transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glass-switch:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.glass-switch:active {
+  transform: scale(0.94) translateY(1px);
+}
+
+.glass-switch__label {
+  order: 2;
+  font-family: var(--body);
+  font-size: 0.52rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  line-height: 1;
+}
+
+.glass-switch__track {
+  order: 1;
+  position: relative;
+  width: 1.05rem;
+  height: 1.85rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.28);
+  transition: background 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.glass-switch__thumb {
+  position: absolute;
+  top: 0.12rem;
+  left: 0.12rem;
+  width: 0.81rem;
+  height: 0.81rem;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff 0%, #f2f2f7 100%);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.28),
+    0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+  will-change: transform;
+}
+
+.glass-switch[aria-pressed="true"] .glass-switch__track {
+  background: rgba(52, 199, 89, 0.85);
+}
+
+.glass-switch[aria-pressed="true"] .glass-switch__thumb {
+  transform: translateY(0.8rem);
+}
+
+@media (max-width: 480px) {
+  .room-switches {
+    right: calc(0.35rem + var(--safe-r));
+    gap: 0.28rem;
+  }
+
+  .glass-switch {
+    width: 2.3rem;
+    padding: 0.24rem 0.22rem 0.28rem;
+    border-radius: 0.75rem;
+  }
+
+  .glass-switch__label {
+    font-size: 0.48rem;
+  }
+
+  .glass-switch__track {
+    width: 0.95rem;
+    height: 1.65rem;
+  }
+
+  .glass-switch__thumb {
+    width: 0.72rem;
+    height: 0.72rem;
+    top: 0.11rem;
+    left: 0.115rem;
+  }
+
+  .glass-switch[aria-pressed="true"] .glass-switch__thumb {
+    transform: translateY(0.7rem);
+  }
 }
 
 :focus-visible {

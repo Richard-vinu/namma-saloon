@@ -29,6 +29,35 @@ export const metadata: Metadata = {
   title: "Namma — ನಮ್ಮ ಸಲೂನ್",
   description:
     "90s Kannada film songs, the ones that played in every Karnataka saloon.",
+  applicationName: "Namma Saloon",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Namma Saloon",
+    statusBarStyle: "black-translucent",
+  },
+  openGraph: {
+    title: "Namma — ನಮ್ಮ ಸಲೂನ್",
+    description:
+      "90s Kannada film songs, the ones that played in every Karnataka saloon.",
+    siteName: "Namma Saloon",
+    images: [{ url: "/og.png", width: 1200, height: 1200, alt: "ನಮ್ಮ ಸಲೂನ್" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Namma — ನಮ್ಮ ಸಲೂನ್",
+    description:
+      "90s Kannada film songs, the ones that played in every Karnataka saloon.",
+    images: ["/og.png"],
+  },
 };
 
 export const viewport: Viewport = {

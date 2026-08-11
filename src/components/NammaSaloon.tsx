@@ -43,6 +43,8 @@ export default function NammaSaloon() {
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [showTube, setShowTube] = useState(true);
+  const [lightsOn, setLightsOn] = useState(true);
+  const [fanOn, setFanOn] = useState(false);
   const [seek, setSeek] = useState(0);
   const [cur, setCur] = useState("0:00");
   const [dur, setDur] = useState("0:00");
@@ -52,11 +54,16 @@ export default function NammaSaloon() {
     "Press play — the radio's on the shelf",
   );
   const [credits, setCredits] = useState("90s Kannada film songs");
+  const [listeners, setListeners] = useState(0);
 
   const playerRef = useRef<YT.Player | null>(null);
   const scrubbingRef = useRef(false);
   const idxRef = useRef(0);
   const playingRef = useRef(false);
+  const acRef = useRef<AudioContext | null>(null);
+  const fanNodesRef = useRef<{
+    stop: () => void;
+  } | null>(null);
   const loadRef = useRef<(autoplay: boolean, at?: number) => Promise<void>>(
     async () => {},
   );
@@ -193,10 +200,190 @@ export default function NammaSaloon() {
     else p.playVideo();
   }
 
+  function getAudio() {
+    const Ctx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
+    if (!acRef.current) acRef.current = new Ctx();
+    return acRef.current;
+  }
+
+  function playSwitchClick(on: boolean) {
+    try {
+      // Physical wall-switch snap (supported on Android / some browsers)
+      navigator.vibrate?.(on ? [14, 28, 10] : [10, 22, 16]);
+    } catch {
+      /* vibrate unsupported */
+    }
+
+    const ac = getAudio();
+    void ac.resume();
+    const t0 = ac.currentTime;
+
+    // Soft mechanical thud + sharp click
+    const thud = ac.createOscillator();
+    const thudGain = ac.createGain();
+    thud.type = "triangle";
+    thud.frequency.setValueAtTime(on ? 140 : 110, t0);
+    thud.frequency.exponentialRampToValueAtTime(55, t0 + 0.06);
+    thudGain.gain.setValueAtTime(0.0001, t0);
+    thudGain.gain.exponentialRampToValueAtTime(0.14, t0 + 0.004);
+    thudGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.08);
+    thud.connect(thudGain).connect(ac.destination);
+    thud.start(t0);
+    thud.stop(t0 + 0.09);
+
+    const click = ac.createOscillator();
+    const clickGain = ac.createGain();
+    click.type = "sine";
+    click.frequency.setValueAtTime(on ? 980 : 420, t0 + 0.012);
+    click.frequency.exponentialRampToValueAtTime(on ? 520 : 240, t0 + 0.05);
+    clickGain.gain.setValueAtTime(0.0001, t0 + 0.012);
+    clickGain.gain.exponentialRampToValueAtTime(0.08, t0 + 0.016);
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07);
+    click.connect(clickGain).connect(ac.destination);
+    click.start(t0 + 0.012);
+    click.stop(t0 + 0.08);
+  }
+
+  function stopFanSound() {
+    fanNodesRef.current?.stop();
+    fanNodesRef.current = null;
+  }
+
+  function startFanSound() {
+    stopFanSound();
+    const ac = getAudio();
+    void ac.resume();
+
+    const secs = 3;
+    const buf = ac.createBuffer(1, ac.sampleRate * secs, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < data.length; i++) {
+      const w = Math.random() * 2 - 1;
+      last = (last + 0.02 * w) / 1.02;
+      data[i] = last * 3.2;
+    }
+
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const lp = ac.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 240;
+    lp.Q.value = 2.5;
+    const wob = ac.createGain();
+    wob.gain.value = 0.55;
+    const lfo = ac.createOscillator();
+    lfo.frequency.value = 4.4;
+    const lfoAmt = ac.createGain();
+    lfoAmt.gain.value = 0.28;
+    const master = ac.createGain();
+    master.gain.value = 0.22;
+    lfo.connect(lfoAmt).connect(wob.gain);
+    src.connect(lp).connect(wob).connect(master).connect(ac.destination);
+    src.start();
+    lfo.start();
+
+    fanNodesRef.current = {
+      stop: () => {
+        try {
+          src.stop();
+          lfo.stop();
+        } catch {
+          /* already stopped */
+        }
+        master.disconnect();
+      },
+    };
+  }
+
+  useEffect(() => {
+    return () => stopFanSound();
+  }, []);
+
+  // Placeholder presence — random floor + +1 on land; swap for Redis later
+  useEffect(() => {
+    const hour = new Date().getHours();
+    const floor = 7 + ((hour * 11) % 28) + Math.floor(Math.random() * 8);
+    setListeners(floor + 1);
+
+    const tick = window.setInterval(() => {
+      setListeners((n) => {
+        const roll = Math.random();
+        if (roll < 0.35) return Math.max(4, n - 1);
+        if (roll < 0.75) return n + 1;
+        return n;
+      });
+    }, 4500);
+
+    return () => window.clearInterval(tick);
+  }, []);
+
+  function toggleLights() {
+    setLightsOn((on) => {
+      const next = !on;
+      playSwitchClick(next);
+      trackEvent("tube_light", { on: next });
+      if (next) {
+        setShowTube(true);
+        window.setTimeout(() => setShowTube(false), 1400);
+      }
+      return next;
+    });
+  }
+
+  function toggleFan() {
+    setFanOn((on) => {
+      const next = !on;
+      playSwitchClick(next);
+      trackEvent("ceiling_fan", { on: next });
+      if (next) startFanSound();
+      else stopFanSound();
+      return next;
+    });
+  }
+
   return (
     <>
-      <div className="fan" aria-hidden="true" />
-      {showTube ? <div className="tube" aria-hidden="true" /> : null}
+      <div
+        className={`fan${fanOn ? "" : " is-off"}`}
+        aria-hidden="true"
+      />
+      {showTube && lightsOn ? (
+        <div className="tube" aria-hidden="true" />
+      ) : null}
+      <div
+        className={`lights-veil${lightsOn ? "" : " is-on"}`}
+        aria-hidden="true"
+      />
+
+      <div className="room-switches" role="group" aria-label="Room switches">
+        <button
+          type="button"
+          className="glass-switch"
+          aria-pressed={lightsOn}
+          onClick={toggleLights}
+        >
+          <span className="glass-switch__label">Light</span>
+          <span className="glass-switch__track" aria-hidden="true">
+            <span className="glass-switch__thumb" />
+          </span>
+        </button>
+        <button
+          type="button"
+          className="glass-switch"
+          aria-pressed={fanOn}
+          onClick={toggleFan}
+        >
+          <span className="glass-switch__label">Fan</span>
+          <span className="glass-switch__track" aria-hidden="true">
+            <span className="glass-switch__thumb" />
+          </span>
+        </button>
+      </div>
 
       <div className="shell">
         <div className="room">
@@ -220,6 +407,12 @@ export default function NammaSaloon() {
           </div>
 
           <div className="dock">
+            {listeners > 0 ? (
+              <p className="listening" aria-live="polite">
+                <span className="listening-dot" aria-hidden="true" />
+                {listeners} listening now
+              </p>
+            ) : null}
             <div className="pill" role="region" aria-label="Now playing">
               <div
                 className="disc"
