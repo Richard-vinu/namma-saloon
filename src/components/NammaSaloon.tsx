@@ -18,15 +18,24 @@ function fmt(s: number) {
 
 function ytReady(): Promise<void> {
   return new Promise((res) => {
-    if (window.YT?.Player) {
+    let settled = false;
+    const finish = () => {
+      if (settled || !window.YT?.Player) return;
+      settled = true;
       res();
+    };
+
+    if (window.YT?.Player) {
+      finish();
       return;
     }
+
     const prev = window.onYouTubeIframeAPIReady;
     window.onYouTubeIframeAPIReady = () => {
       prev?.();
-      res();
+      finish();
     };
+
     if (
       !document.querySelector(
         'script[src="https://www.youtube.com/iframe_api"]',
@@ -36,7 +45,22 @@ function ytReady(): Promise<void> {
       s.src = "https://www.youtube.com/iframe_api";
       document.head.appendChild(s);
     }
+
+    // Cover the race where the API fires before our callback is hooked
+    const poll = window.setInterval(() => {
+      finish();
+      if (settled) window.clearInterval(poll);
+    }, 40);
+    window.setTimeout(() => window.clearInterval(poll), 20000);
   });
+}
+
+function readVideoId(player: YT.Player | null | undefined): string {
+  try {
+    return player?.getVideoData?.()?.video_id?.trim() || "";
+  } catch {
+    return "";
+  }
 }
 
 export default function NammaSaloon() {
@@ -57,6 +81,7 @@ export default function NammaSaloon() {
   const [listeners, setListeners] = useState(0);
 
   const playerRef = useRef<YT.Player | null>(null);
+  const playerReadyRef = useRef<Promise<YT.Player> | null>(null);
   const scrubbingRef = useRef(false);
   const idxRef = useRef(0);
   const playingRef = useRef(false);
@@ -89,28 +114,65 @@ export default function NammaSaloon() {
 
   const ensurePlayer = useCallback(async () => {
     if (playerRef.current) return playerRef.current;
-    await ytReady();
-    await new Promise<void>((res) => {
-      playerRef.current = new window.YT!.Player("ytplayer", {
-        height: "1",
-        width: "1",
-        playerVars: { playsinline: 1, controls: 0 },
-        events: {
-          onReady: () => res(),
-          onStateChange: (e) => {
-            if (e.data === window.YT!.PlayerState.ENDED) step(1);
-            if (e.data === window.YT!.PlayerState.PLAYING) setPlayingState(true);
-            if (e.data === window.YT!.PlayerState.PAUSED) setPlayingState(false);
-          },
-          onError: () => {
-            setNeedsSearch(false);
-            setFilmLine("That upload won't play here — skipping");
-            setTimeout(() => step(1), 1400);
-          },
-        },
+    if (playerReadyRef.current) return playerReadyRef.current;
+
+    playerReadyRef.current = (async () => {
+      await ytReady();
+
+      const host = document.getElementById("ytplayer");
+      if (!host) {
+        throw new Error("YouTube host missing");
+      }
+
+      return await new Promise<YT.Player>((res, rej) => {
+        try {
+          const player = new window.YT!.Player(host, {
+            height: 180,
+            width: 320,
+            playerVars: {
+              playsinline: 1,
+              controls: 0,
+              rel: 0,
+              fs: 0,
+              disablekb: 1,
+              modestbranding: 1,
+              enablejsapi: 1,
+              origin: window.location.origin,
+            },
+            events: {
+              onReady: (e) => {
+                playerRef.current = e.target;
+                res(e.target);
+              },
+              onStateChange: (e) => {
+                if (e.data === window.YT!.PlayerState.ENDED) step(1);
+                if (e.data === window.YT!.PlayerState.PLAYING)
+                  setPlayingState(true);
+                if (e.data === window.YT!.PlayerState.PAUSED)
+                  setPlayingState(false);
+              },
+              onError: () => {
+                setNeedsSearch(false);
+                setFilmLine("That upload won't play here — skipping");
+                setPlayingState(false);
+                window.setTimeout(() => step(1), 1400);
+              },
+            },
+          });
+          playerRef.current = player;
+        } catch (err) {
+          playerReadyRef.current = null;
+          rej(err);
+        }
       });
-    });
-    return playerRef.current!;
+    })();
+
+    try {
+      return await playerReadyRef.current;
+    } catch (err) {
+      playerReadyRef.current = null;
+      throw err;
+    }
   }, [setPlayingState, step]);
 
   useEffect(() => {
@@ -140,10 +202,17 @@ export default function NammaSaloon() {
 
       setNeedsSearch(false);
       setFilmLine(`${t.film} (${t.year})`);
+
       const p = await ensurePlayer();
-      p.loadVideoById(t.yt.trim());
-      if (autoplay) p.playVideo();
-      else p.pauseVideo();
+      const id = t.yt.trim();
+
+      if (autoplay) {
+        p.loadVideoById(id);
+        // playVideo after load — media engagement usually allows this after first user tap
+        p.playVideo();
+      } else {
+        p.cueVideoById(id);
+      }
     };
   }, [ensurePlayer, setPlayingState]);
 
@@ -151,6 +220,8 @@ export default function NammaSaloon() {
     const start = Math.floor(Math.random() * TRACKS.length);
     idxRef.current = start;
     setIdx(start);
+    // Warm the API + cue the first song so Play stays inside the user gesture
+    void loadRef.current(false, start);
     const t = setTimeout(() => setShowTube(false), 1700);
     return () => clearTimeout(t);
   }, []);
@@ -187,17 +258,48 @@ export default function NammaSaloon() {
 
   async function onPlay() {
     const t = TRACKS[idxRef.current];
-    if (!t.yt.trim()) {
+    const id = t.yt.trim();
+    if (!id) {
       await loadRef.current(false);
       return;
     }
-    const p = await ensurePlayer();
-    if (!p.getVideoData?.()?.video_id) {
-      await loadRef.current(true);
-      return;
+
+    // Fast path: player already warm — keep play/pause synchronous with the click
+    const existing = playerRef.current;
+    if (existing?.playVideo) {
+      const loaded = readVideoId(existing);
+      if (loaded === id || loaded) {
+        if (loaded !== id) {
+          existing.loadVideoById(id);
+        }
+        if (playingRef.current) {
+          existing.pauseVideo();
+        } else {
+          existing.playVideo();
+          trackEvent("song_play", {
+            title: t.title,
+            film: t.film,
+            year: t.year,
+          });
+        }
+        return;
+      }
     }
-    if (playingRef.current) p.pauseVideo();
-    else p.playVideo();
+
+    // Cold start (API still loading): still attempt play after warm-up
+    try {
+      const p = await ensurePlayer();
+      const loaded = readVideoId(p);
+      if (loaded !== id) p.loadVideoById(id);
+      p.playVideo();
+      trackEvent("song_play", {
+        title: t.title,
+        film: t.film,
+        year: t.year,
+      });
+    } catch {
+      setFilmLine("Player couldn't start — try again");
+    }
   }
 
   function getAudio() {

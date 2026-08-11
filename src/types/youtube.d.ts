@@ -35,12 +35,15 @@ declare global {
     class Player {
       constructor(elementId: string | HTMLElement, options: PlayerOptions);
       loadVideoById(videoId: string): void;
+      cueVideoById(videoId: string): void;
       playVideo(): void;
       pauseVideo(): void;
       seekTo(seconds: number, allowSeekAhead: boolean): void;
       getDuration(): number;
       getCurrentTime(): number;
+      getPlayerState(): number;
       getVideoData(): { video_id?: string };
+      destroy(): void;
     }
   }
 }

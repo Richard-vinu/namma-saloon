@@ -884,14 +884,16 @@ body::before {
   outline-offset: 3px;
 }
 
+/* Off-screen but real-sized — tiny 1×1 players often fail to start audio */
 #ytbox {
   position: fixed;
-  width: 1px;
-  height: 1px;
-  opacity: 0.001;
+  width: 320px;
+  height: 180px;
+  left: -9999px;
+  top: 0;
+  opacity: 0;
   pointer-events: none;
-  left: -10px;
-  top: -10px;
+  overflow: hidden;
 }
 
 /* Short portrait */

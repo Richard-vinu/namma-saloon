@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     author: `${CREATOR.name}, ${CREATOR.url}`,
     "article:author": CREATOR.url,
   },
-  referrer: "origin-when-cross-origin",
+  referrer: "strict-origin-when-cross-origin",
   robots: {
     index: true,
     follow: true,
