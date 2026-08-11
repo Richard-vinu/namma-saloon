@@ -304,20 +304,41 @@ export default function NammaSaloon() {
     return () => stopFanSound();
   }, []);
 
-  // Placeholder presence — random floor + +1 on land; swap for Redis later
+  // Placeholder presence — persists across refresh; only ±1 while open
   useEffect(() => {
-    const hour = new Date().getHours();
-    const floor = 7 + ((hour * 11) % 28) + Math.floor(Math.random() * 8);
-    setListeners(floor + 1);
+    const MIN = 120;
+    const MAX = 320;
+    const KEY = "namma-listeners";
+
+    let start = MIN + 80; // ~200 default
+    try {
+      const saved = Number(window.localStorage.getItem(KEY));
+      if (Number.isFinite(saved) && saved >= MIN && saved <= MAX) {
+        start = Math.round(saved);
+      } else {
+        // One-time seed from the hour so first visits aren't wild
+        const hour = new Date().getHours();
+        start = MIN + ((hour * 17) % (MAX - MIN + 1));
+      }
+    } catch {
+      /* private mode */
+    }
+    setListeners(start);
 
     const tick = window.setInterval(() => {
       setListeners((n) => {
         const roll = Math.random();
-        if (roll < 0.35) return Math.max(4, n - 1);
-        if (roll < 0.75) return n + 1;
-        return n;
+        let next = n;
+        if (roll < 0.4) next = Math.max(MIN, n - 4);
+        else if (roll < 0.8) next = Math.min(MAX, n + 4);
+        try {
+          window.localStorage.setItem(KEY, String(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
       });
-    }, 4500);
+    }, 5000);
 
     return () => window.clearInterval(tick);
   }, []);
@@ -395,7 +416,7 @@ export default function NammaSaloon() {
                   <img
                     className="brand-logo"
                     src="/logo.png"
-                    alt="ನಮ್ಮ ಸಲೂನ್ · ESTD. ೧೯೪೦"
+                    alt="Namma Saloon — ನಮ್ಮ ಸಲೂನ್ logo, ESTD 1940"
                     width={1255}
                     height={763}
                     draggable={false}

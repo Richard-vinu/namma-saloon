@@ -1,6 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { Anek_Kannada, DM_Mono, Karla } from "next/font/google";
+import { JsonLd } from "@/components/JsonLd";
+import {
+  CREATOR,
+  SITE_DESCRIPTION,
+  SITE_KEYWORDS,
+  SITE_NAME,
+  SITE_TITLE,
+  SITE_URL,
+} from "@/lib/seo";
 import "./globals.css";
 
 const anekKannada = Anek_Kannada({
@@ -26,10 +35,44 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Namma — ನಮ್ಮ ಸಲೂನ್",
-  description:
-    "90s Kannada film songs, the ones that played in every Karnataka saloon.",
-  applicationName: "Namma Saloon",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: SITE_KEYWORDS,
+  authors: [{ name: CREATOR.name, url: CREATOR.url }],
+  creator: `${CREATOR.name} — ${CREATOR.url}`,
+  publisher: CREATOR.name,
+  category: "music",
+  classification: "Entertainment",
+  other: {
+    "geo.region": "IN-KA",
+    "geo.placename": "Karnataka, India",
+    author: `${CREATOR.name}, ${CREATOR.url}`,
+    "article:author": CREATOR.url,
+  },
+  referrer: "origin-when-cross-origin",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  alternates: {
+    canonical: SITE_URL,
+    languages: {
+      "en-IN": SITE_URL,
+      "kn-IN": SITE_URL,
+    },
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -40,23 +83,32 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "Namma Saloon",
+    title: SITE_NAME,
     statusBarStyle: "black-translucent",
   },
   openGraph: {
-    title: "Namma — ನಮ್ಮ ಸಲೂನ್",
-    description:
-      "90s Kannada film songs, the ones that played in every Karnataka saloon.",
-    siteName: "Namma Saloon",
-    images: [{ url: "/og.png", width: 1200, height: 1200, alt: "ನಮ್ಮ ಸಲೂನ್" }],
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    locale: "en_IN",
+    alternateLocale: ["kn_IN"],
     type: "website",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 1200,
+        alt: "ನಮ್ಮ ಸಲೂನ್ — Namma Saloon",
+      },
+    ],
   },
   twitter: {
-    card: "summary",
-    title: "Namma — ನಮ್ಮ ಸಲೂನ್",
-    description:
-      "90s Kannada film songs, the ones that played in every Karnataka saloon.",
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     images: ["/og.png"],
+    creator: CREATOR.name,
   },
 };
 
@@ -64,6 +116,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#1a1410" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1410" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -73,6 +129,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${anekKannada.variable} ${karla.variable} ${dmMono.variable}`}
     >
       <body>
+        <JsonLd />
         {children}
         <Analytics />
       </body>
